@@ -1,0 +1,428 @@
+<!doctype html>
+<html lang="vi">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SG&amp;A Dashboard</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+/* ============ MÀU SẮC (đổi ở đây là đổi toàn bộ) ============ */
+:root {
+  color-scheme: light;
+  --bg: #f4f4f1;
+  --surface: #fcfcfb;
+  --border: #e3e2dd;
+  --text-1: #0b0b0b;
+  --text-2: #52514e;
+  --text-3: #8a8984;
+  --grid: #ecebe7;
+  --accent: #2a78d6;
+  --good: #1a7f37;
+  --warn: #b26b00;
+  --bad: #c62828;
+  /* 8 màu hạng mục — thứ tự cố định, đã kiểm tra an toàn cho người mù màu */
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100;
+  --s5:#e87ba4; --s6:#008300; --s7:#6250d6; --s8:#e34948;
+}
+@media (prefers-color-scheme: dark) {
+  :root:where(:not([data-theme="light"])) {
+    color-scheme: dark;
+    --bg:#121211; --surface:#1a1a19; --border:#2e2e2b;
+    --text-1:#f0efec; --text-2:#c3c2b7; --text-3:#8d8c84; --grid:#2a2a27;
+    --accent:#3987e5; --good:#4caf6a; --warn:#e0a030; --bad:#ef6a6a;
+    --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+    --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+  }
+}
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --bg:#121211; --surface:#1a1a19; --border:#2e2e2b;
+  --text-1:#f0efec; --text-2:#c3c2b7; --text-3:#8d8c84; --grid:#2a2a27;
+  --accent:#3987e5; --good:#4caf6a; --warn:#e0a030; --bad:#ef6a6a;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500;
+  --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+}
+
+* { box-sizing: border-box; }
+body {
+  margin: 0; background: var(--bg); color: var(--text-1);
+  font-family: "Be Vietnam Pro", system-ui, sans-serif; font-size: 14px;
+}
+.wrap { max-width: 1280px; margin: 0 auto; padding: 20px 16px 40px; }
+
+header { display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end; justify-content: space-between; margin-bottom: 16px; }
+h1 { font-size: 22px; margin: 0; letter-spacing: -0.01em; }
+.sub { color: var(--text-2); margin-top: 4px; font-size: 13px; }
+.actions { display: flex; gap: 8px; flex-wrap: wrap; }
+button, .btn {
+  font: inherit; font-size: 13px; padding: 7px 12px; border-radius: 8px; cursor: pointer;
+  border: 1px solid var(--border); background: var(--surface); color: var(--text-1);
+}
+button:hover, .btn:hover { border-color: var(--accent); }
+
+/* Bộ lọc */
+.filters { display: flex; flex-wrap: wrap; gap: 16px; align-items: center; background: var(--surface);
+  border: 1px solid var(--border); border-radius: 12px; padding: 12px 14px; margin-bottom: 16px; }
+.filters label { color: var(--text-2); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; margin-right: 6px; }
+.chips { display: inline-flex; flex-wrap: wrap; gap: 6px; }
+.chip { padding: 5px 12px; border-radius: 999px; font-size: 13px; }
+.chip.on { background: var(--accent); border-color: var(--accent); color: #fff; }
+select { font: inherit; font-size: 13px; padding: 6px 8px; border-radius: 8px; border: 1px solid var(--border); background: var(--surface); color: var(--text-1); }
+
+/* KPI */
+.kpis { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; margin-bottom: 16px; }
+.kpi { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; }
+.kpi .lbl { color: var(--text-2); font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; }
+.kpi .val { font-size: 28px; font-weight: 700; margin-top: 6px; letter-spacing: -0.02em; font-variant-numeric: tabular-nums; }
+.kpi .note { font-size: 12px; color: var(--text-2); margin-top: 4px; }
+.status { font-weight: 600; }
+.status.good { color: var(--good); } .status.warn { color: var(--warn); } .status.bad { color: var(--bad); }
+
+/* Khung chart */
+.grid2 { display: grid; grid-template-columns: 3fr 2fr; gap: 12px; margin-bottom: 12px; }
+.card { background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 14px 16px; min-width: 0; }
+.card h2 { font-size: 13px; margin: 0 0 2px; font-weight: 600; text-transform: uppercase; letter-spacing: .04em; color: var(--text-2); }
+.card .hint { font-size: 12px; color: var(--text-3); margin-bottom: 10px; }
+.chart-box { position: relative; height: 320px; }
+
+/* Bảng */
+.table-wrap { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+th, td { padding: 9px 10px; text-align: right; border-bottom: 1px solid var(--border); white-space: nowrap; }
+th:first-child, td:first-child { text-align: left; }
+th { font-size: 12px; color: var(--text-2); font-weight: 600; text-transform: uppercase; letter-spacing: .03em; }
+tr:last-child td { border-bottom: 0; }
+tfoot td { font-weight: 700; border-top: 2px solid var(--border); }
+
+.msg { padding: 40px; text-align: center; color: var(--text-2); }
+.err { color: var(--bad); }
+
+@media (max-width: 900px) {
+  .kpis { grid-template-columns: repeat(2, 1fr); }
+  .grid2 { grid-template-columns: 1fr; }
+}
+@media (max-width: 480px) {
+  .kpi .val { font-size: 22px; }
+  .chart-box { height: 280px; }
+}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>SG&amp;A Dashboard</h1>
+      <div class="sub" id="source">Đang tải dữ liệu…</div>
+    </div>
+    <div class="actions">
+      <label class="btn" title="Mở file CSV hoặc Excel trên máy">
+        Mở file CSV / Excel
+        <input type="file" id="fileInput" accept=".csv,.xlsx,.xls" hidden>
+      </label>
+      <button id="reloadBtn">Tải lại từ Google Sheet</button>
+      <button id="themeBtn" title="Đổi giao diện sáng / tối">Sáng / Tối</button>
+    </div>
+  </header>
+
+  <div class="filters">
+    <div><label>Site</label><span class="chips" id="siteChips"></span></div>
+    <div>
+      <label>Từ</label><select id="fromMonth"></select>
+      <label style="margin-left:8px">Đến</label><select id="toMonth"></select>
+    </div>
+  </div>
+
+  <div id="content"><div class="msg">Đang tải dữ liệu…</div></div>
+</div>
+
+<script>
+/* ================== CẤU HÌNH ==================
+   Dán link Web App (/exec) của Apps Script vào API_URL.
+   Để trống "" → web dùng file data-mau.json đi kèm (chế độ demo). */
+const CONFIG = {
+     API_URL: "https://script.google.com/macros/s/AKfycby.../exec",
+   TOKEN: "minh-sga-2026",   // phải giống TOKEN trong Code.gs
+  DEMO_FILE: "data-mau.json"
+};
+
+const state = { rows: [], sites: [], months: [], cats: [], selSites: new Set(), from: "", to: "" };
+const charts = {};
+Chart.defaults.font.family = "'Be Vietnam Pro', system-ui, sans-serif";
+
+/* ---------- Tiện ích định dạng ---------- */
+const nfInt = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 0 });
+const nf1 = new Intl.NumberFormat("vi-VN", { maximumFractionDigits: 1 });
+function money(v) {             // 1.234.000.000 → "1,23 tỷ"
+  const a = Math.abs(v);
+  if (a >= 1e9) return nf1.format(v / 1e9) + " tỷ";
+  if (a >= 1e6) return nf1.format(v / 1e6) + " tr";
+  return nfInt.format(v) + " đ";
+}
+function pct(v) { return nf1.format(v * 100) + "%"; }
+function monthLabel(m) { const [y, mm] = m.split("-"); return "T" + Number(mm) + "/" + y.slice(2); }
+function css(name) { return getComputedStyle(document.documentElement).getPropertyValue(name).trim(); }
+function seriesColor(i) { return css("--s" + ((i % 8) + 1)); }
+
+/* ---------- Chuẩn hoá dữ liệu (giống Code.gs) ---------- */
+function toNumber(v) {
+  if (typeof v === "number") return v;
+  let s = String(v ?? "").trim().replace(/\s|đ|VND/gi, "");
+  if (!s) return 0;
+  const dots = (s.match(/\./g) || []).length, commas = (s.match(/,/g) || []).length;
+  if (dots > 1) s = s.replace(/\./g, "").replace(",", ".");
+  else if (commas > 1) s = s.replace(/,/g, "");
+  else if (commas === 1 && dots === 0) s = s.replace(",", ".");
+  else if (commas === 1 && dots === 1) s = s.replace(",", "");
+  const n = Number(s); return isNaN(n) ? 0 : n;
+}
+function toMonth(v) {
+  if (v instanceof Date) return v.getFullYear() + "-" + String(v.getMonth() + 1).padStart(2, "0");
+  if (typeof v === "number" && v > 20000 && v < 80000) {   // số ngày kiểu Excel
+    const d = new Date(Math.round((v - 25569) * 864e5));
+    return d.getUTCFullYear() + "-" + String(d.getUTCMonth() + 1).padStart(2, "0");
+  }
+  const s = String(v ?? "").trim();
+  let m = s.match(/^(\d{4})[-/](\d{1,2})/); if (m) return m[1] + "-" + m[2].padStart(2, "0");
+  m = s.match(/^(\d{1,2})[-/](\d{4})$/);    if (m) return m[2] + "-" + m[1].padStart(2, "0");
+  m = s.match(/^(\d{1,2})[-/](\d{1,2})[-/](\d{4})$/); if (m) return m[3] + "-" + m[2].padStart(2, "0"); // dd/mm/yyyy
+  return s;
+}
+function normalizeRow(r) {
+  // nhận cả tên cột gốc (Thang, Site...) lẫn tên đã chuẩn (thang, site...)
+  const g = (a, b) => r[a] !== undefined ? r[a] : r[b];
+  return {
+    thang: toMonth(g("thang", "Thang")),
+    site: String(g("site", "Site") ?? "").trim(),
+    hangMuc: String(g("hangMuc", "HangMuc") ?? "").trim(),
+    nganSach: toNumber(g("nganSach", "NganSach")),
+    thucTe: toNumber(g("thucTe", "ThucTe")),
+    sanLuong: toNumber(g("sanLuong", "SanLuong"))
+  };
+}
+
+/* ---------- Nạp dữ liệu ---------- */
+async function loadFromApi() {
+  setMsg("Đang tải dữ liệu…");
+  try {
+    let url, label;
+    if (CONFIG.API_URL) {
+      url = CONFIG.API_URL + (CONFIG.API_URL.includes("?") ? "&" : "?") + "token=" + encodeURIComponent(CONFIG.TOKEN);
+      label = "Google Sheet (Apps Script API)";
+    } else {
+      url = CONFIG.DEMO_FILE; label = "Dữ liệu mẫu (chế độ demo — chưa nối Google Sheet)";
+    }
+    const res = await fetch(url);
+    if (!res.ok) throw new Error("HTTP " + res.status);
+    const data = await res.json();
+    if (!data.ok) throw new Error(data.error || "API báo lỗi");
+    setData(data.rows.map(normalizeRow), label + " · cập nhật " + new Date(data.updated).toLocaleString("vi-VN"));
+  } catch (e) {
+    setMsg('<span class="err">Không tải được dữ liệu: ' + e.message + '</span><br><br>Kiểm tra API_URL, TOKEN và quyền truy cập Web App ("Anyone").');
+    document.getElementById("source").textContent = "Lỗi tải dữ liệu";
+  }
+}
+
+function loadFromFile(file) {
+  const reader = new FileReader();
+  reader.onload = (ev) => {
+    try {
+      const wb = XLSX.read(ev.target.result, { type: "array", cellDates: true });
+      const ws = wb.Sheets["Data"] || wb.Sheets[wb.SheetNames[0]];
+      const json = XLSX.utils.sheet_to_json(ws, { defval: "" });
+      const rows = json.map(normalizeRow).filter(r => r.site);
+      if (!rows.length) throw new Error("File không có dòng dữ liệu hợp lệ");
+      setData(rows, "File trên máy: " + file.name + " (" + rows.length + " dòng)");
+    } catch (e) { alert("Không đọc được file: " + e.message); }
+  };
+  reader.readAsArrayBuffer(file);
+}
+
+function setData(rows, label) {
+  state.rows = rows.filter(r => r.site && r.thang);
+  state.sites = [...new Set(state.rows.map(r => r.site))].sort();
+  state.months = [...new Set(state.rows.map(r => r.thang))].sort();
+  // thứ tự hạng mục: theo tổng chi phí giảm dần → màu luôn gắn cố định với hạng mục
+  const tot = {};
+  state.rows.forEach(r => tot[r.hangMuc] = (tot[r.hangMuc] || 0) + r.thucTe);
+  state.cats = Object.keys(tot).sort((a, b) => tot[b] - tot[a]);
+  state.selSites = new Set(state.sites);
+  state.from = state.months[0]; state.to = state.months[state.months.length - 1];
+  document.getElementById("source").textContent = "Nguồn: " + label;
+  buildFilters(); render();
+}
+
+/* ---------- Bộ lọc ---------- */
+function buildFilters() {
+  const chips = document.getElementById("siteChips");
+  chips.innerHTML = "";
+  const all = document.createElement("button");
+  const allOn = state.selSites.size === state.sites.length;
+  all.className = "chip" + (allOn ? " on" : ""); all.textContent = "Tất cả";
+  all.onclick = () => { state.selSites = new Set(state.sites); buildFilters(); render(); };
+  chips.appendChild(all);
+  state.sites.forEach(s => {
+    const b = document.createElement("button");
+    b.className = "chip" + (!allOn && state.selSites.has(s) ? " on" : "");
+    b.textContent = s;
+    b.onclick = () => {
+      // đang xem tất cả → bấm 1 site = chỉ xem site đó; sau đó bấm thêm để cộng/bớt site
+      if (allOn) state.selSites = new Set([s]);
+      else if (state.selSites.has(s) && state.selSites.size > 1) state.selSites.delete(s);
+      else state.selSites.add(s);
+      buildFilters(); render();
+    };
+    chips.appendChild(b);
+  });
+  const opts = state.months.map(m => `<option value="${m}">${monthLabel(m)}</option>`).join("");
+  const f = document.getElementById("fromMonth"), t = document.getElementById("toMonth");
+  f.innerHTML = opts; t.innerHTML = opts; f.value = state.from; t.value = state.to;
+}
+document.getElementById("fromMonth").onchange = e => { state.from = e.target.value; if (state.from > state.to) state.to = state.from; buildFilters(); render(); };
+document.getElementById("toMonth").onchange = e => { state.to = e.target.value; if (state.to < state.from) state.from = state.to; buildFilters(); render(); };
+
+/* ---------- Tính toán ---------- */
+function filtered() {
+  return state.rows.filter(r => state.selSites.has(r.site) && r.thang >= state.from && r.thang <= state.to);
+}
+// Sản lượng lặp lại trên mỗi dòng hạng mục → chỉ lấy 1 lần cho mỗi (tháng, site)
+function ordersBy(rows, keyFn) {
+  const seen = new Map();
+  rows.forEach(r => seen.set(r.thang + "|" + r.site, r));
+  const out = {};
+  seen.forEach(r => { const k = keyFn(r); out[k] = (out[k] || 0) + r.sanLuong; });
+  return out;
+}
+function statusOf(ratio) {   // % thực hiện ngân sách
+  if (ratio <= 1) return { cls: "good", txt: "✓ Trong ngân sách" };
+  if (ratio <= 1.05) return { cls: "warn", txt: "▲ Vượt nhẹ" };
+  return { cls: "bad", txt: "▲ Vượt ngân sách" };
+}
+
+/* ---------- Vẽ ---------- */
+function setMsg(html) { document.getElementById("content").innerHTML = `<div class="msg">${html}</div>`; }
+
+function render() {
+  const rows = filtered();
+  const actual = rows.reduce((s, r) => s + r.thucTe, 0);
+  const budget = rows.reduce((s, r) => s + r.nganSach, 0);
+  const orders = Object.values(ordersBy(rows, () => "all")).reduce((a, b) => a + b, 0);
+  const ratio = budget ? actual / budget : 0;
+  const st = statusOf(ratio);
+
+  document.getElementById("content").innerHTML = `
+    <section class="kpis">
+      <div class="kpi"><div class="lbl">Chi phí thực tế</div><div class="val">${money(actual)}</div><div class="note">${nfInt.format(actual)} đ</div></div>
+      <div class="kpi"><div class="lbl">Ngân sách</div><div class="val">${money(budget)}</div><div class="note">Chênh lệch: ${money(actual - budget)}</div></div>
+      <div class="kpi"><div class="lbl">% thực hiện ngân sách</div><div class="val">${pct(ratio)}</div><div class="note status ${st.cls}">${st.txt}</div></div>
+      <div class="kpi"><div class="lbl">Chi phí / đơn</div><div class="val">${orders ? nfInt.format(actual / orders) + " đ" : "—"}</div><div class="note">${nfInt.format(orders)} đơn</div></div>
+    </section>
+    <section class="grid2">
+      <div class="card"><h2>Chi phí thực tế theo site</h2><div class="hint">Chia theo hạng mục · rê chuột để xem chi tiết</div><div class="chart-box"><canvas id="cSite"></canvas></div></div>
+      <div class="card"><h2>Chi phí / đơn theo tháng</h2><div class="hint">Mỗi đường là một site (đồng/đơn)</div><div class="chart-box"><canvas id="cTrend"></canvas></div></div>
+    </section>
+    <section class="card">
+      <h2>Ngân sách vs thực tế theo site</h2><div class="hint">Bảng số liệu chi tiết</div>
+      <div class="table-wrap">${tableHtml(rows)}</div>
+    </section>`;
+
+  drawSiteChart(rows);
+  drawTrendChart(rows);
+}
+
+function tableHtml(rows) {
+  const sites = state.sites.filter(s => state.selSites.has(s));
+  const ord = ordersBy(rows, r => r.site);
+  let tB = 0, tA = 0, tO = 0;
+  const body = sites.map(s => {
+    const rs = rows.filter(r => r.site === s);
+    const b = rs.reduce((x, r) => x + r.nganSach, 0), a = rs.reduce((x, r) => x + r.thucTe, 0), o = ord[s] || 0;
+    tB += b; tA += a; tO += o;
+    const st = statusOf(b ? a / b : 0);
+    return `<tr><td>${s}</td><td>${money(b)}</td><td>${money(a)}</td><td>${money(a - b)}</td>
+      <td>${b ? pct(a / b) : "—"}</td><td>${o ? nfInt.format(a / o) : "—"}</td><td class="status ${st.cls}">${st.txt}</td></tr>`;
+  }).join("");
+  const stT = statusOf(tB ? tA / tB : 0);
+  return `<table>
+    <thead><tr><th>Site</th><th>Ngân sách</th><th>Thực tế</th><th>Chênh lệch</th><th>% thực hiện</th><th>Đồng / đơn</th><th>Trạng thái</th></tr></thead>
+    <tbody>${body}</tbody>
+    <tfoot><tr><td>Tổng</td><td>${money(tB)}</td><td>${money(tA)}</td><td>${money(tA - tB)}</td><td>${tB ? pct(tA / tB) : "—"}</td><td>${tO ? nfInt.format(tA / tO) : "—"}</td><td class="status ${stT.cls}">${stT.txt}</td></tr></tfoot>
+  </table>`;
+}
+
+function baseOptions() {
+  return {
+    responsive: true, maintainAspectRatio: false,
+    interaction: { mode: "index", intersect: false },
+    plugins: {
+      legend: { position: "bottom", labels: { color: css("--text-2"), boxWidth: 10, boxHeight: 10, usePointStyle: true, pointStyle: "rectRounded", font: { size: 12 } } },
+      tooltip: { backgroundColor: css("--surface"), titleColor: css("--text-1"), bodyColor: css("--text-1"), borderColor: css("--border"), borderWidth: 1, padding: 10,
+                 titleFont: { weight: "600" }, boxPadding: 4 }
+    },
+    scales: {
+      x: { grid: { display: false }, border: { color: css("--border") }, ticks: { color: css("--text-2") } },
+      y: { grid: { color: css("--grid") }, border: { display: false }, ticks: { color: css("--text-2") } }
+    }
+  };
+}
+
+function drawSiteChart(rows) {
+  const sites = state.sites.filter(s => state.selSites.has(s));
+  const datasets = state.cats.map((c, i) => ({
+    label: c,
+    data: sites.map(s => rows.filter(r => r.site === s && r.hangMuc === c).reduce((x, r) => x + r.thucTe, 0)),
+    backgroundColor: seriesColor(i),
+    borderColor: css("--surface"), borderWidth: { top: 2 }, borderSkipped: false,
+    borderRadius: 4, maxBarThickness: 56
+  }));
+  const opt = baseOptions();
+  opt.scales.x.stacked = true; opt.scales.y.stacked = true;
+  opt.scales.y.ticks.callback = v => money(v);
+  opt.plugins.tooltip.callbacks = {
+    label: ctx => " " + ctx.dataset.label + ": " + money(ctx.parsed.y),
+    footer: items => "Tổng: " + money(items.reduce((s, i) => s + i.parsed.y, 0))
+  };
+  charts.site?.destroy();
+  charts.site = new Chart(document.getElementById("cSite"), { type: "bar", data: { labels: sites, datasets }, options: opt });
+}
+
+function drawTrendChart(rows) {
+  const months = state.months.filter(m => m >= state.from && m <= state.to);
+  const ord = ordersBy(rows, r => r.thang + "|" + r.site);
+  // màu theo site cố định theo thứ tự site gốc → lọc site không làm đổi màu
+  const datasets = state.sites.filter(s => state.selSites.has(s)).map(s => {
+    const idx = state.sites.indexOf(s);
+    return {
+      label: s,
+      data: months.map(m => {
+        const a = rows.filter(r => r.site === s && r.thang === m).reduce((x, r) => x + r.thucTe, 0);
+        const o = ord[m + "|" + s] || 0;
+        return o ? Math.round(a / o) : null;
+      }),
+      borderColor: seriesColor(idx), backgroundColor: seriesColor(idx),
+      borderWidth: 2, pointRadius: 3, pointHoverRadius: 5, tension: 0
+    };
+  });
+  const opt = baseOptions();
+  opt.scales.y.ticks.callback = v => nfInt.format(v);
+  opt.plugins.tooltip.callbacks = { label: ctx => " " + ctx.dataset.label + ": " + nfInt.format(ctx.parsed.y) + " đ/đơn" };
+  charts.trend?.destroy();
+  charts.trend = new Chart(document.getElementById("cTrend"), { type: "line", data: { labels: months.map(monthLabel), datasets }, options: opt });
+}
+
+/* ---------- Nút bấm ---------- */
+document.getElementById("reloadBtn").onclick = loadFromApi;
+document.getElementById("fileInput").onchange = e => { if (e.target.files[0]) loadFromFile(e.target.files[0]); e.target.value = ""; };
+document.getElementById("themeBtn").onclick = () => {
+  const root = document.documentElement;
+  const dark = root.dataset.theme ? root.dataset.theme === "dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  root.dataset.theme = dark ? "light" : "dark";
+  if (state.rows.length) render();   // vẽ lại để chart lấy màu mới
+};
+
+loadFromApi();
+</script>
+</body>
+</html>
